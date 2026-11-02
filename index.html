@@ -193,21 +193,46 @@ function query(lat,lng,r){
   const bakery=(k==='all'||k==='cafe')?`nwr(around:${r},${lat},${lng})["shop"="bakery"]["name"];`:'';
   return `[out:json][timeout:15];(nwr(around:${r},${lat},${lng})["amenity"~"^(${am})$"]["name"];${bakery});out center tags 150;`;
 }
-async function fetchPlaces(lat,lng,r){
-  // ask several public servers at once and use whichever answers first
+const sleep=ms=>new Promise(r=>setTimeout(r,ms));
+const KIND_Q={all:['restaurant','fast food','cafe'],meal:['restaurant'],snack:['fast food'],cafe:['cafe','ice cream']};
+function toPlace(lat,lng,t,la,lo){
+  const L=look(t),d=km(lat,lng,la,lo);
+  return{name:t.name,lat:la,lng:lo,km:d,label:L[0],emo:L[1],bg:L[2],hours:t.opening_hours||'',phone:t.phone||'',veg:/yes|only/.test(t['diet:vegetarian']||'')};
+}
+// main source: OpenStreetMap Nominatim (fast). Its usage policy allows ~1 request per second, so requests are spaced out.
+async function fetchNominatim(lat,lng,r,words){
+  const dLat=r/111000,dLng=r/(111000*Math.cos(lat*Math.PI/180));
+  const vb=[lng-dLng,lat+dLat,lng+dLng,lat-dLat].map(v=>v.toFixed(5)).join(',');
+  const out=[];
+  for(let i=0;i<words.length;i++){
+    if(i)await sleep(1100);
+    const u='https://nominatim.openstreetmap.org/search?format=jsonv2&bounded=1&limit=40&extratags=1&namedetails=1&accept-language=zh-TW&viewbox='+vb+'&q='+encodeURIComponent(words[i]);
+    const res=await fetch(u);if(!res.ok)throw new Error('http '+res.status);
+    const j=await res.json();
+    j.forEach(x=>{const nd=x.namedetails||{},et=x.extratags||{};const name=nd['name:zh']||nd['name:zh-Hant']||x.name||nd.name;if(!name)return;
+      out.push(toPlace(lat,lng,Object.assign({},et,{name,amenity:x.type}),+x.lat,+x.lon))});
+  }
+  return out;
+}
+// backup source: Overpass (often overloaded, so only used if Nominatim fails)
+async function fetchOverpass(lat,lng,r){
   const body='data='+encodeURIComponent(query(lat,lng,r));
   const ctls=OVERPASS.map(()=>new AbortController());
-  const tryOne=(url,i)=>{const t=setTimeout(()=>ctls[i].abort(),20000);
+  const tryOne=(url,i)=>{const t=setTimeout(()=>ctls[i].abort(),15000);
     return fetch(url,{method:'POST',body,headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctls[i].signal})
       .then(r=>{if(!r.ok)throw new Error('http '+r.status);return r.json()})
       .then(j=>{if(!j||!Array.isArray(j.elements))throw new Error('bad');return j})
       .finally(()=>clearTimeout(t))};
   const j=await Promise.any(OVERPASS.map((u,i)=>tryOne(u,i).then(r=>{ctls.forEach((c,k)=>k!==i&&c.abort());return r})));
-  const seen=new Set();
-  return j.elements.map(e=>{const t=e.tags||{},la=e.lat??e.center?.lat,lo=e.lon??e.center?.lon;if(la==null)return null;
-    const key=t.name+'|'+la.toFixed(4);if(seen.has(key))return null;seen.add(key);
-    const L=look(t),d=km(lat,lng,la,lo);
-    return{name:t['name:zh']||t.name,lat:la,lng:lo,km:d,label:L[0],emo:L[1],bg:L[2],hours:t.opening_hours||'',phone:t.phone||t['contact:phone']||'',veg:/yes|only/.test(t['diet:vegetarian']||'')}}).filter(Boolean);
+  return j.elements.map(e=>{const t=e.tags||{},la=e.lat??e.center?.lat,lo=e.lon??e.center?.lon;if(la==null||!t.name)return null;
+    return toPlace(lat,lng,Object.assign({},t,{name:t['name:zh']||t.name}),la,lo)}).filter(Boolean);
+}
+function dedupe(list){const seen=new Set();return list.filter(p=>{const k=p.name+'|'+p.lat.toFixed(4);if(seen.has(k))return false;seen.add(k);return true})}
+async function fetchPlaces(lat,lng,r){
+  let list;
+  try{list=await fetchNominatim(lat,lng,r,KIND_Q[S.kind]||KIND_Q.all)}
+  catch(e){list=await fetchOverpass(lat,lng,r)}
+  return dedupe(list).filter(p=>p.km<=r/1000*1.45);
 }
 function shuffleNear(arr){
   // mostly by distance, with a little randomness so it feels fresh
@@ -219,7 +244,7 @@ async function start(lat,lng){
   try{
     // walkable range first (fast); widen to a 10-minute ride only if there are too few shops
     let ps=await fetchPlaces(lat,lng,900);
-    if(ps.length<20){msg('附近店不多，幫你找騎車 10 分鐘內的…');try{const more=await fetchPlaces(lat,lng,2500);const seen=new Set(ps.map(p=>p.name+p.lat.toFixed(4)));ps=ps.concat(more.filter(p=>!seen.has(p.name+p.lat.toFixed(4))))}catch(e){}}
+    if(ps.length<20){msg('附近店不多，幫你找騎車 10 分鐘內的…');try{await sleep(1100);ps=dedupe(ps.concat(await fetchPlaces(lat,lng,2500)))}catch(e){}}
     if(!ps.length){msg('這附近找不到店，換個地點試試。');return}
     S.places=shuffleNear(ps);S.i=0;S.liked=[];S.hist=[];msg('');
     show('vSwipe');renderDeck();
