@@ -191,11 +191,11 @@ function query(lat,lng,r){
   if(k==='snack')am='fast_food|food_court';
   if(k==='cafe')am='cafe|ice_cream';
   const bakery=(k==='all'||k==='cafe')?`nwr(around:${r},${lat},${lng})["shop"="bakery"]["name"];`:'';
-  return `[out:json][timeout:20];(nwr(around:${r},${lat},${lng})["amenity"~"^(${am})$"]["name"];${bakery});out center tags 300;`;
+  return `[out:json][timeout:15];(nwr(around:${r},${lat},${lng})["amenity"~"^(${am})$"]["name"];${bakery});out center tags 150;`;
 }
-async function fetchPlaces(lat,lng){
+async function fetchPlaces(lat,lng,r){
   // ask several public servers at once and use whichever answers first
-  const body='data='+encodeURIComponent(query(lat,lng,S.dist));
+  const body='data='+encodeURIComponent(query(lat,lng,r));
   const ctls=OVERPASS.map(()=>new AbortController());
   const tryOne=(url,i)=>{const t=setTimeout(()=>ctls[i].abort(),20000);
     return fetch(url,{method:'POST',body,headers:{'Content-Type':'application/x-www-form-urlencoded'},signal:ctls[i].signal})
@@ -217,7 +217,9 @@ function shuffleNear(arr){
 async function start(lat,lng){
   S.lat=lat;S.lng=lng;msg('正在找附近的店…');
   try{
-    const ps=await fetchPlaces(lat,lng);
+    // walkable range first (fast); widen to a 10-minute ride only if there are too few shops
+    let ps=await fetchPlaces(lat,lng,900);
+    if(ps.length<20){msg('附近店不多，幫你找騎車 10 分鐘內的…');try{const more=await fetchPlaces(lat,lng,2500);const seen=new Set(ps.map(p=>p.name+p.lat.toFixed(4)));ps=ps.concat(more.filter(p=>!seen.has(p.name+p.lat.toFixed(4))))}catch(e){}}
     if(!ps.length){msg('這附近找不到店，換個地點試試。');return}
     S.places=shuffleNear(ps);S.i=0;S.liked=[];S.hist=[];msg('');
     show('vSwipe');renderDeck();
