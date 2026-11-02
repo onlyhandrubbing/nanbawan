@@ -1,0 +1,316 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>附近難波萬</title>
+<meta name="description" content="不知道要吃什麼？左滑右滑，幫你從附近的店挑出難波萬。">
+<meta property="og:title" content="附近難波萬">
+<meta property="og:description" content="選擇障礙救星：滑一滑，附近吃什麼馬上決定。">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;700;900&display=swap">
+<style>
+/* Layout: one phone screen, chunky sticker look — cream paper, tomato red "想吃", slate "跳過", food cards like menu stickers. Single committed light look. */
+:root{
+  color-scheme:light;
+  --bg:#FFF4E6; --card:#FFFFFF; --ink:#2A1E1A; --mute:#7A6A60; --line:#F0DCC6;
+  --like:#FF5A3C; --nope:#5B6B7A; --gold:#FFB703; --mint:#2EC4B6;
+  --font:"Noto Sans TC","PingFang TC","Microsoft JhengHei",system-ui,sans-serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.5 var(--font);-webkit-tap-highlight-color:transparent}
+.app{max-width:440px;margin:0 auto;min-height:100%;display:flex;flex-direction:column;padding:max(14px,env(safe-area-inset-top,0px)) max(16px,env(safe-area-inset-right,0px)) max(16px,env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px));gap:14px}
+h1{font-weight:900;font-size:2.4rem;line-height:1.05;margin:0;letter-spacing:.02em}
+h1 em{font-style:normal;color:var(--like);display:inline-block;transform:rotate(-3deg)}
+h2{font-weight:900;font-size:1.4rem;margin:0}
+p{margin:0}
+.muted{color:var(--mute);font-size:.92rem}
+[hidden]{display:none!important}
+button{font:inherit;cursor:pointer}
+:focus-visible{outline:3px solid var(--gold);outline-offset:2px}
+.top{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.top .logo{font-weight:900;font-size:1.25rem}
+.top .logo em{font-style:normal;color:var(--like)}
+.chip-btn{border:2px solid var(--ink);background:var(--card);border-radius:999px;padding:6px 12px;font-weight:700;font-size:.85rem}
+
+/* start */
+.hero{background:var(--card);border:3px solid var(--ink);border-radius:20px;padding:20px;box-shadow:6px 6px 0 var(--ink);display:flex;flex-direction:column;gap:12px}
+.stack-demo{font-size:2.8rem;letter-spacing:.05em;text-align:center;margin:4px 0}
+.opt-group{display:flex;flex-direction:column;gap:6px}
+.opt-group .lbl{font-weight:900;font-size:.9rem}
+.seg{display:flex;flex-wrap:wrap;gap:6px}
+.seg button{border:2px solid var(--ink);background:var(--card);border-radius:999px;padding:7px 14px;font-weight:700}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+.big{border:3px solid var(--ink);background:var(--like);color:#fff;border-radius:16px;padding:15px;font-weight:900;font-size:1.15rem;box-shadow:4px 4px 0 var(--ink)}
+.big:active{transform:translate(2px,2px);box-shadow:2px 2px 0 var(--ink)}
+.big.alt{background:var(--card);color:var(--ink)}
+.place{display:flex;gap:8px}
+.place input{flex:1;min-width:0;border:2px solid var(--ink);border-radius:12px;padding:11px 12px;font:inherit;background:#fff}
+.place button{border:2px solid var(--ink);border-radius:12px;background:var(--gold);font-weight:900;padding:0 14px}
+.msg{min-height:1.4em;font-size:.9rem;font-weight:700;color:var(--like)}
+
+/* deck */
+.deck{position:relative;flex:1;min-height:440px}
+.card{position:absolute;inset:0;background:var(--card);border:3px solid var(--ink);border-radius:22px;box-shadow:6px 6px 0 var(--ink);overflow:hidden;display:flex;flex-direction:column;touch-action:none;user-select:none;will-change:transform}
+.card .pic{flex:1;min-height:200px;display:grid;place-items:center;position:relative;overflow:hidden}
+.card .pic .emo{font-size:7.5rem;filter:drop-shadow(0 6px 0 rgba(0,0,0,.12));transform:rotate(-6deg)}
+.card .pic .tag{position:absolute;left:14px;top:14px;background:#fff;border:2px solid var(--ink);border-radius:999px;padding:3px 12px;font-weight:900;font-size:.9rem}
+.card .pic .dist{position:absolute;right:14px;top:14px;background:var(--ink);color:#fff;border-radius:999px;padding:3px 12px;font-weight:900;font-size:.9rem}
+.card .info{padding:16px 18px 18px;display:flex;flex-direction:column;gap:6px;border-top:3px solid var(--ink)}
+.card .name{font-weight:900;font-size:1.55rem;line-height:1.2;overflow-wrap:anywhere}
+.card .meta{display:flex;flex-wrap:wrap;gap:6px}
+.card .meta span{background:var(--bg);border-radius:8px;padding:2px 8px;font-size:.82rem;font-weight:700;color:var(--mute)}
+.stamp{position:absolute;top:26px;font-weight:900;font-size:2rem;padding:4px 14px;border:4px solid;border-radius:12px;opacity:0;pointer-events:none;background:rgba(255,255,255,.85)}
+.stamp.like{left:22px;color:var(--like);border-color:var(--like);transform:rotate(-14deg)}
+.stamp.nope{right:22px;color:var(--nope);border-color:var(--nope);transform:rotate(14deg)}
+.empty{position:absolute;inset:0;display:grid;place-items:center;text-align:center;padding:20px;border:3px dashed var(--line);border-radius:22px}
+.controls{display:flex;justify-content:center;align-items:center;gap:22px}
+.ctl{width:68px;height:68px;border-radius:50%;border:3px solid var(--ink);background:#fff;font-size:1.9rem;display:grid;place-items:center;box-shadow:3px 3px 0 var(--ink)}
+.ctl.no{color:var(--nope)}
+.ctl.yes{color:#fff;background:var(--like);width:78px;height:78px;font-size:2.2rem}
+.ctl.undo{width:48px;height:48px;font-size:1.1rem}
+.ctl:active{transform:translate(2px,2px);box-shadow:1px 1px 0 var(--ink)}
+.hint{text-align:center;font-size:.8rem;color:var(--mute)}
+.progress{display:flex;justify-content:space-between;font-size:.85rem;font-weight:700;color:var(--mute)}
+
+/* result */
+.winner{background:var(--like);color:#fff;border:3px solid var(--ink);border-radius:20px;padding:18px;box-shadow:6px 6px 0 var(--ink);display:flex;flex-direction:column;gap:8px;text-align:center}
+.winner .crown{font-size:2.6rem}
+.winner .wname{font-weight:900;font-size:1.7rem;line-height:1.2;overflow-wrap:anywhere}
+.winner a{color:#fff}
+.wbtns{display:flex;gap:8px;justify-content:center;flex-wrap:wrap}
+.wbtns a,.wbtns button{background:#fff;color:var(--ink);border:2px solid var(--ink);border-radius:999px;padding:8px 14px;font-weight:900;text-decoration:none;font-size:.9rem}
+.list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}
+.list li{display:grid;grid-template-columns:52px 1fr auto;gap:12px;align-items:center;background:#fff;border:2px solid var(--ink);border-radius:14px;padding:10px 12px}
+.list .e{font-size:2rem;text-align:center}
+.list b{display:block;overflow-wrap:anywhere}
+.list small{color:var(--mute);font-weight:700}
+.list a{font-weight:900;color:var(--like);text-decoration:none;white-space:nowrap;font-size:.9rem}
+.foot{font-size:.72rem;color:var(--mute);text-align:center;margin-top:auto}
+.foot a{color:var(--mute)}
+@media (prefers-reduced-motion:reduce){.card{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+
+<!-- START -->
+<section id="vStart" class="hero" aria-labelledby="t1">
+  <h1 id="t1">附近<br><em>難波萬</em></h1>
+  <p>不知道要吃什麼？把附近的店一張一張滑過去，<b>右滑想吃、左滑跳過</b>，最後幫你挑出今天的難波萬。</p>
+  <div class="stack-demo" aria-hidden="true">🍜🍣🍔🧋🍛</div>
+  <div class="opt-group">
+    <span class="lbl">想吃哪一類？</span>
+    <div class="seg" id="segKind">
+      <button aria-pressed="true" data-v="all">都可以</button>
+      <button aria-pressed="false" data-v="meal">正餐</button>
+      <button aria-pressed="false" data-v="snack">小吃速食</button>
+      <button aria-pressed="false" data-v="cafe">咖啡甜點飲料</button>
+    </div>
+  </div>
+  <div class="opt-group">
+    <span class="lbl">走多遠可以？</span>
+    <div class="seg" id="segDist">
+      <button aria-pressed="false" data-v="400">5 分鐘</button>
+      <button aria-pressed="true" data-v="800">10 分鐘</button>
+      <button aria-pressed="false" data-v="1500">20 分鐘</button>
+    </div>
+  </div>
+  <button class="big" id="goGps">📍 用我現在的位置開始</button>
+  <div class="place">
+    <input id="placeIn" type="text" placeholder="或輸入地點，例：台北車站、逢甲夜市" aria-label="輸入地點">
+    <button id="goPlace">找</button>
+  </div>
+  <p class="msg" id="startMsg" aria-live="polite"></p>
+</section>
+
+<!-- SWIPE -->
+<section id="vSwipe" hidden style="display:flex;flex-direction:column;gap:14px;flex:1">
+  <div class="top"><span class="logo">附近<em>難波萬</em></span><button class="chip-btn" id="toResult">看結果</button></div>
+  <div class="progress"><span id="prog">0 / 0</span><span id="likeCount">想吃 0 間</span></div>
+  <div class="deck" id="deck"></div>
+  <div class="controls">
+    <button class="ctl undo" id="btnUndo" aria-label="上一張">↩</button>
+    <button class="ctl no" id="btnNo" aria-label="跳過">✕</button>
+    <button class="ctl yes" id="btnYes" aria-label="想吃">♥</button>
+  </div>
+  <p class="hint">右滑或按 ♥ 想吃，左滑或按 ✕ 跳過</p>
+</section>
+
+<!-- RESULT -->
+<section id="vResult" hidden style="display:flex;flex-direction:column;gap:14px">
+  <div class="top"><span class="logo">附近<em>難波萬</em></span><button class="chip-btn" id="again">重新開始</button></div>
+  <div class="winner" id="winner"></div>
+  <h2 id="listTitle">你想吃的店</h2>
+  <ul class="list" id="list"></ul>
+  <button class="big alt" id="moreSwipe">繼續滑剩下的店</button>
+</section>
+
+<p class="foot">店家資料來自 <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noopener">© OpenStreetMap 貢獻者</a>，可能有遺漏或已歇業，出發前請用 Google 地圖確認。</p>
+</div>
+
+<script>
+(function(){
+const $=id=>document.getElementById(id);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const OVERPASS=['https://overpass-api.de/api/interpreter','https://overpass.kumi.systems/api/interpreter'];
+
+/* cuisine → label, emoji, background */
+const CUISINE={
+ ramen:['拉麵','🍜','#FFE3B3'],noodle:['麵食','🍜','#FFE3B3'],japanese:['日式','🍱','#FFD9D2'],sushi:['壽司','🍣','#FFD9D2'],
+ korean:['韓式','🥘','#FFD0C2'],chinese:['中式','🥟','#FFE6C7'],taiwanese:['台式','🥢','#FFE6C7'],dumpling:['水餃','🥟','#FFE6C7'],
+ hot_pot:['火鍋','🍲','#FFCBC0'],barbecue:['燒烤','🍖','#FFD3B5'],thai:['泰式','🍛','#D9F2C6'],vietnamese:['越式','🍜','#D9F2C6'],
+ indian:['印度','🍛','#FFE0A6'],curry:['咖哩','🍛','#FFE0A6'],italian:['義式','🍝','#D8F0D3'],pizza:['披薩','🍕','#FFE0C2'],
+ burger:['漢堡','🍔','#FFE0B3'],american:['美式','🍔','#FFE0B3'],chicken:['炸雞','🍗','#FFE0B3'],fried_chicken:['炸雞','🍗','#FFE0B3'],
+ steak_house:['牛排','🥩','#F7D3C8'],seafood:['海鮮','🦐','#CDEBF5'],vegetarian:['素食','🥗','#D9F2C6'],vegan:['蔬食','🥗','#D9F2C6'],
+ breakfast:['早午餐','🍳','#FFF0B8'],sandwich:['三明治','🥪','#FFF0B8'],bakery:['麵包','🥐','#FCE5C4'],
+ coffee_shop:['咖啡','☕','#EADBCF'],cafe:['咖啡','☕','#EADBCF'],bubble_tea:['手搖飲','🧋','#E7D8F5'],tea:['茶飲','🍵','#DDF0D8'],
+ dessert:['甜點','🍰','#FADADD'],ice_cream:['冰品','🍨','#DDF1FA'],cake:['蛋糕','🍰','#FADADD'],donut:['甜甜圈','🍩','#FADADD']
+};
+const AMEN={restaurant:['餐廳','🍽️','#FFE6C7'],fast_food:['速食小吃','🍟','#FFE0B3'],cafe:['咖啡','☕','#EADBCF'],ice_cream:['冰品','🍨','#DDF1FA'],food_court:['美食街','🍱','#FFE6C7'],bar:['酒吧','🍻','#FFE9A8'],pub:['酒館','🍺','#FFE9A8'],bakery:['麵包','🥐','#FCE5C4']};
+function look(t){
+  const cs=(t.cuisine||'').toLowerCase().split(/[;,]/).map(s=>s.trim()).filter(Boolean);
+  for(const c of cs)if(CUISINE[c])return CUISINE[c];
+  if(t.shop==='bakery')return AMEN.bakery;
+  return AMEN[t.amenity]||['美食','🍽️','#FFE6C7'];
+}
+
+/* state */
+const S={kind:'all',dist:800,lat:0,lng:0,places:[],i:0,liked:[],hist:[]};
+function seg(id,key){$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.setAttribute('aria-pressed',x===b));S[key]=key==='dist'?+b.dataset.v:b.dataset.v})}
+seg('segKind','kind');seg('segDist','dist');
+const show=v=>['vStart','vSwipe','vResult'].forEach(x=>$(x).hidden=x!==v);
+const msg=t=>$('startMsg').textContent=t||'';
+
+/* distance */
+function km(a,b,c,d){const R=6371,r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
+const walkMin=k=>Math.max(1,Math.round(k*1.25/4.8*60));
+
+/* data */
+function query(lat,lng,r){
+  const k=S.kind;
+  let am='restaurant|fast_food|cafe|ice_cream|food_court';
+  if(k==='meal')am='restaurant|food_court';
+  if(k==='snack')am='fast_food|food_court';
+  if(k==='cafe')am='cafe|ice_cream';
+  const bakery=(k==='all'||k==='cafe')?`nwr(around:${r},${lat},${lng})["shop"="bakery"]["name"];`:'';
+  return `[out:json][timeout:20];(nwr(around:${r},${lat},${lng})["amenity"~"^(${am})$"]["name"];${bakery});out center tags 200;`;
+}
+async function fetchPlaces(lat,lng){
+  let last;
+  for(const url of OVERPASS){
+    try{
+      const res=await fetch(url,{method:'POST',body:'data='+encodeURIComponent(query(lat,lng,S.dist)),headers:{'Content-Type':'application/x-www-form-urlencoded'}});
+      if(!res.ok)throw new Error('http '+res.status);
+      const j=await res.json();
+      const seen=new Set();
+      return j.elements.map(e=>{const t=e.tags||{},la=e.lat??e.center?.lat,lo=e.lon??e.center?.lon;if(la==null)return null;
+        const key=t.name+'|'+la.toFixed(4);if(seen.has(key))return null;seen.add(key);
+        const L=look(t),d=km(lat,lng,la,lo);
+        return{name:t['name:zh']||t.name,lat:la,lng:lo,km:d,label:L[0],emo:L[1],bg:L[2],hours:t.opening_hours||'',phone:t.phone||t['contact:phone']||'',veg:/yes|only/.test(t['diet:vegetarian']||'')}}).filter(Boolean);
+    }catch(e){last=e}
+  }
+  throw last;
+}
+function shuffleNear(arr){
+  // mostly by distance, with a little randomness so it feels fresh
+  return arr.map(p=>({p,s:p.km+Math.random()*0.35})).sort((a,b)=>a.s-b.s).map(x=>x.p).slice(0,40);
+}
+async function start(lat,lng){
+  S.lat=lat;S.lng=lng;msg('正在找附近的店…');
+  try{
+    const ps=await fetchPlaces(lat,lng);
+    if(!ps.length){msg('這附近找不到店，試試走遠一點，或換個地點。');return}
+    S.places=shuffleNear(ps);S.i=0;S.liked=[];S.hist=[];msg('');
+    show('vSwipe');renderDeck();
+  }catch(e){msg('店家資料讀取失敗，等幾秒再按一次。')}
+}
+$('goGps').onclick=()=>{
+  if(!navigator.geolocation){msg('這個瀏覽器不能定位，請改用輸入地點。');return}
+  msg('正在取得你的位置…（請按允許）');
+  navigator.geolocation.getCurrentPosition(p=>start(p.coords.latitude,p.coords.longitude),
+    e=>msg(e.code===1?'沒有定位權限。請到瀏覽器設定允許定位，或改用輸入地點。':'抓不到位置，請改用輸入地點。'),
+    {enableHighAccuracy:true,timeout:10000,maximumAge:60000});
+};
+async function geocode(){
+  const q=$('placeIn').value.trim();if(!q){msg('請先輸入地點。');return}
+  msg('正在找「'+q+'」…');
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&accept-language=zh-TW&countrycodes=tw,hk,jp,kr,mo&q='+encodeURIComponent(q));
+    const j=await r.json();
+    if(!j.length){msg('找不到「'+q+'」，換個寫法試試，例如加上縣市。');return}
+    start(+j[0].lat,+j[0].lon);
+  }catch(e){msg('地點查詢失敗，等幾秒再試一次。')}
+}
+$('goPlace').onclick=geocode;
+$('placeIn').addEventListener('keydown',e=>{if(e.key==='Enter')geocode()});
+
+/* deck */
+const gmUrl=p=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.name+' '+p.lat.toFixed(5)+','+p.lng.toFixed(5));
+function cardHTML(p){
+  return `<div class="pic" style="background:${p.bg}"><span class="tag">${esc(p.label)}</span><span class="dist">走路 ${walkMin(p.km)} 分</span><span class="emo">${p.emo}</span>
+  <span class="stamp like">想吃</span><span class="stamp nope">跳過</span></div>
+  <div class="info"><div class="name">${esc(p.name)}</div><div class="meta"><span>${p.km<1?Math.round(p.km*1000)+' 公尺':p.km.toFixed(1)+' 公里'}</span>${p.hours?`<span>${esc(p.hours.slice(0,40))}</span>`:''}${p.veg?'<span>有素食</span>':''}</div></div>`;
+}
+function renderDeck(){
+  const deck=$('deck');deck.innerHTML='';
+  const rest=S.places.slice(S.i,S.i+3);
+  $('prog').textContent=Math.min(S.i+1,S.places.length)+' / '+S.places.length;
+  $('likeCount').textContent='想吃 '+S.liked.length+' 間';
+  if(!rest.length){deck.innerHTML=`<div class="empty"><div><p style="font-size:3rem">🎉</p><h2>滑完了！</h2><p class="muted">看看今天的難波萬是誰。</p><br><button class="big" id="seeRes">看結果</button></div></div>`;$('seeRes').onclick=showResult;return}
+  rest.reverse().forEach((p,k)=>{const el=document.createElement('div');el.className='card';el.innerHTML=cardHTML(p);
+    const depth=rest.length-1-k;el.style.transform=`translateY(${depth*10}px) scale(${1-depth*.04})`;el.style.zIndex=10-depth;deck.appendChild(el);
+    if(depth===0)drag(el)});
+}
+function decide(like,el){
+  const p=S.places[S.i];if(!p)return;
+  el=el||$('deck').lastElementChild;
+  if(el&&el.classList.contains('card')){el.style.transition='transform .3s ease-out,opacity .3s';el.style.transform=`translate(${like?520:-520}px,40px) rotate(${like?24:-24}deg)`;el.style.opacity='0'}
+  if(like)S.liked.push(p);S.hist.push(like);S.i++;
+  setTimeout(renderDeck,220);
+}
+function drag(el){
+  let x0=0,y0=0,dx=0,dy=0,down=false;
+  const like=el.querySelector('.stamp.like'),nope=el.querySelector('.stamp.nope');
+  el.addEventListener('pointerdown',e=>{down=true;x0=e.clientX;y0=e.clientY;el.setPointerCapture(e.pointerId);el.style.transition='none'});
+  el.addEventListener('pointermove',e=>{if(!down)return;dx=e.clientX-x0;dy=e.clientY-y0;el.style.transform=`translate(${dx}px,${dy*.3}px) rotate(${dx/18}deg)`;like.style.opacity=Math.max(0,Math.min(1,dx/90));nope.style.opacity=Math.max(0,Math.min(1,-dx/90))});
+  const up=()=>{if(!down)return;down=false;
+    if(Math.abs(dx)>90)decide(dx>0,el);
+    else{el.style.transition='transform .25s';el.style.transform='';like.style.opacity=nope.style.opacity=0}
+    dx=dy=0};
+  el.addEventListener('pointerup',up);el.addEventListener('pointercancel',up);
+}
+$('btnYes').onclick=()=>decide(true);
+$('btnNo').onclick=()=>decide(false);
+$('btnUndo').onclick=()=>{if(!S.i)return;S.i--;const was=S.hist.pop();if(was)S.liked.pop();renderDeck()};
+document.addEventListener('keydown',e=>{if($('vSwipe').hidden)return;if(e.key==='ArrowRight')decide(true);if(e.key==='ArrowLeft')decide(false)});
+
+/* result */
+function pickWinner(){
+  const pool=S.liked;if(!pool.length)return null;
+  return pool[Math.floor(Math.random()*pool.length)];
+}
+function renderWinner(w){
+  $('winner').innerHTML=w?`<span class="crown">👑</span><span>今天的難波萬</span><span class="wname">${esc(w.name)}</span><span>${w.emo} ${esc(w.label)}・走路約 ${walkMin(w.km)} 分鐘</span>
+  <div class="wbtns"><a href="${gmUrl(w)}" target="_blank" rel="noopener">在 Google 地圖看照片評論</a><button id="reroll">不要這間，再抽一次</button></div>`
+  :`<span class="crown">🤔</span><span class="wname">你一間都沒選</span><span>沒關係，從剩下的店再滑一次，或回去換個條件。</span>`;
+  const rr=$('reroll');if(rr)rr.onclick=()=>{let n=w,t=0;while(S.liked.length>1&&n===w&&t++<20)n=pickWinner();renderWinner(n)};
+}
+function showResult(){
+  show('vResult');
+  renderWinner(pickWinner());
+  const L=[...S.liked].sort((a,b)=>a.km-b.km);
+  $('listTitle').textContent=L.length?'你想吃的 '+L.length+' 間（近到遠）':'';
+  $('list').innerHTML=L.map(p=>`<li><span class="e">${p.emo}</span><div><b>${esc(p.name)}</b><small>${esc(p.label)}・走路 ${walkMin(p.km)} 分</small></div><a href="${gmUrl(p)}" target="_blank" rel="noopener">地圖 ↗</a></li>`).join('');
+  $('moreSwipe').hidden=S.i>=S.places.length;
+}
+$('toResult').onclick=showResult;
+$('moreSwipe').onclick=()=>{show('vSwipe');renderDeck()};
+$('again').onclick=()=>{show('vStart');msg('')};
+window.__nbw={S,start,look};
+})();
+</script>
+</body>
+</html>
