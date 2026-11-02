@@ -110,14 +110,7 @@ button{font:inherit;cursor:pointer}
       <button aria-pressed="false" data-v="cafe">咖啡甜點飲料</button>
     </div>
   </div>
-  <div class="opt-group">
-    <span class="lbl">走多遠可以？</span>
-    <div class="seg" id="segDist">
-      <button aria-pressed="false" data-v="400">5 分鐘</button>
-      <button aria-pressed="true" data-v="800">10 分鐘</button>
-      <button aria-pressed="false" data-v="1500">20 分鐘</button>
-    </div>
-  </div>
+  <p class="muted">只找走路到得了、騎車 10 分鐘內的店，越近的越先出現。</p>
   <button class="big" id="goGps">📍 用我現在的位置開始</button>
   <div class="place">
     <input id="placeIn" type="text" placeholder="或輸入地點，例：台北車站、逢甲夜市" aria-label="輸入地點">
@@ -178,15 +171,17 @@ function look(t){
 }
 
 /* state */
-const S={kind:'all',dist:800,lat:0,lng:0,places:[],i:0,liked:[],hist:[]};
+const S={kind:'all',dist:3000,lat:0,lng:0,places:[],i:0,liked:[],hist:[]};
 function seg(id,key){$(id).addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;[...$(id).children].forEach(x=>x.setAttribute('aria-pressed',x===b));S[key]=key==='dist'?+b.dataset.v:b.dataset.v})}
-seg('segKind','kind');seg('segDist','dist');
+seg('segKind','kind');
 const show=v=>['vStart','vSwipe','vResult'].forEach(x=>$(x).hidden=x!==v);
 const msg=t=>$('startMsg').textContent=t||'';
 
 /* distance */
 function km(a,b,c,d){const R=6371,r=Math.PI/180,x=Math.sin((c-a)*r/2)**2+Math.cos(a*r)*Math.cos(c*r)*Math.sin((d-b)*r/2)**2;return 2*R*Math.asin(Math.sqrt(x))}
 const walkMin=k=>Math.max(1,Math.round(k*1.25/4.8*60));
+const rideMin=k=>Math.max(2,Math.round(k*1.3/22*60+2));
+const howFar=k=>walkMin(k)<=15?'走路 '+walkMin(k)+' 分':'騎車 '+rideMin(k)+' 分';
 
 /* data */
 function query(lat,lng,r){
@@ -196,7 +191,7 @@ function query(lat,lng,r){
   if(k==='snack')am='fast_food|food_court';
   if(k==='cafe')am='cafe|ice_cream';
   const bakery=(k==='all'||k==='cafe')?`nwr(around:${r},${lat},${lng})["shop"="bakery"]["name"];`:'';
-  return `[out:json][timeout:20];(nwr(around:${r},${lat},${lng})["amenity"~"^(${am})$"]["name"];${bakery});out center tags 200;`;
+  return `[out:json][timeout:20];(nwr(around:${r},${lat},${lng})["amenity"~"^(${am})$"]["name"];${bakery});out center tags 400;`;
 }
 async function fetchPlaces(lat,lng){
   let last;
@@ -216,13 +211,14 @@ async function fetchPlaces(lat,lng){
 }
 function shuffleNear(arr){
   // mostly by distance, with a little randomness so it feels fresh
-  return arr.map(p=>({p,s:p.km+Math.random()*0.35})).sort((a,b)=>a.s-b.s).map(x=>x.p).slice(0,40);
+  // walkable first; farther (scooter) ones mixed in with a little randomness
+  return arr.map(p=>({p,s:p.km+Math.random()*(p.km<1.2?0.3:0.8)})).sort((a,b)=>a.s-b.s).map(x=>x.p).slice(0,40);
 }
 async function start(lat,lng){
   S.lat=lat;S.lng=lng;msg('正在找附近的店…');
   try{
     const ps=await fetchPlaces(lat,lng);
-    if(!ps.length){msg('這附近找不到店，試試走遠一點，或換個地點。');return}
+    if(!ps.length){msg('這附近找不到店，換個地點試試。');return}
     S.places=shuffleNear(ps);S.i=0;S.liked=[];S.hist=[];msg('');
     show('vSwipe');renderDeck();
   }catch(e){msg('店家資料讀取失敗，等幾秒再按一次。')}
@@ -250,7 +246,7 @@ $('placeIn').addEventListener('keydown',e=>{if(e.key==='Enter')geocode()});
 /* deck */
 const gmUrl=p=>'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(p.name+' '+p.lat.toFixed(5)+','+p.lng.toFixed(5));
 function cardHTML(p){
-  return `<div class="pic" style="background:${p.bg}"><span class="tag">${esc(p.label)}</span><span class="dist">走路 ${walkMin(p.km)} 分</span><span class="emo">${p.emo}</span>
+  return `<div class="pic" style="background:${p.bg}"><span class="tag">${esc(p.label)}</span><span class="dist">${howFar(p.km)}</span><span class="emo">${p.emo}</span>
   <span class="stamp like">想吃</span><span class="stamp nope">跳過</span></div>
   <div class="info"><div class="name">${esc(p.name)}</div><div class="meta"><span>${p.km<1?Math.round(p.km*1000)+' 公尺':p.km.toFixed(1)+' 公里'}</span>${p.hours?`<span>${esc(p.hours.slice(0,40))}</span>`:''}${p.veg?'<span>有素食</span>':''}</div></div>`;
 }
@@ -293,7 +289,7 @@ function pickWinner(){
   return pool[Math.floor(Math.random()*pool.length)];
 }
 function renderWinner(w){
-  $('winner').innerHTML=w?`<span class="crown">👑</span><span>今天的難波萬</span><span class="wname">${esc(w.name)}</span><span>${w.emo} ${esc(w.label)}・走路約 ${walkMin(w.km)} 分鐘</span>
+  $('winner').innerHTML=w?`<span class="crown">👑</span><span>今天的難波萬</span><span class="wname">${esc(w.name)}</span><span>${w.emo} ${esc(w.label)}・${howFar(w.km)}鐘</span>
   <div class="wbtns"><a href="${gmUrl(w)}" target="_blank" rel="noopener">在 Google 地圖看照片評論</a><button id="reroll">不要這間，再抽一次</button></div>`
   :`<span class="crown">🤔</span><span class="wname">你一間都沒選</span><span>沒關係，從剩下的店再滑一次，或回去換個條件。</span>`;
   const rr=$('reroll');if(rr)rr.onclick=()=>{let n=w,t=0;while(S.liked.length>1&&n===w&&t++<20)n=pickWinner();renderWinner(n)};
@@ -303,7 +299,7 @@ function showResult(){
   renderWinner(pickWinner());
   const L=[...S.liked].sort((a,b)=>a.km-b.km);
   $('listTitle').textContent=L.length?'你想吃的 '+L.length+' 間（近到遠）':'';
-  $('list').innerHTML=L.map(p=>`<li><span class="e">${p.emo}</span><div><b>${esc(p.name)}</b><small>${esc(p.label)}・走路 ${walkMin(p.km)} 分</small></div><a href="${gmUrl(p)}" target="_blank" rel="noopener">地圖 ↗</a></li>`).join('');
+  $('list').innerHTML=L.map(p=>`<li><span class="e">${p.emo}</span><div><b>${esc(p.name)}</b><small>${esc(p.label)}・${howFar(p.km)}</small></div><a href="${gmUrl(p)}" target="_blank" rel="noopener">地圖 ↗</a></li>`).join('');
   $('moreSwipe').hidden=S.i>=S.places.length;
 }
 $('toResult').onclick=showResult;
